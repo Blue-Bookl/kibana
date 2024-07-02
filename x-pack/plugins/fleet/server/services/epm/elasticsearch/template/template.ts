@@ -14,6 +14,8 @@ import type {
 import pMap from 'p-map';
 import { isResponseError } from '@kbn/es-errors';
 
+import { STACK_COMPONENT_TEMPLATE_LOGS_MAPPINGS } from '../../../../constants/fleet_es_assets';
+
 import type { Field, Fields } from '../../fields/field';
 import type {
   RegistryDataStream,
@@ -135,7 +137,7 @@ const getBaseEsComponents = (type: string, isIndexModeTimeSeries: boolean): stri
 
     return [STACK_COMPONENT_TEMPLATE_METRICS_SETTINGS];
   } else if (type === 'logs') {
-    return [STACK_COMPONENT_TEMPLATE_LOGS_SETTINGS];
+    return [STACK_COMPONENT_TEMPLATE_LOGS_MAPPINGS, STACK_COMPONENT_TEMPLATE_LOGS_SETTINGS];
   }
 
   return [];
@@ -449,6 +451,10 @@ function _generateMappings(
             throw new PackageInvalidArchiveError(
               `No dynamic mapping generated for field ${path} of type ${field.object_type}`
             );
+        }
+
+        if (field.dimension && isIndexModeTimeSeries) {
+          dynProperties.time_series_dimension = field.dimension;
         }
 
         // When a wildcard field specifies the subobjects setting,
@@ -1006,7 +1012,6 @@ const updateExistingDataStream = async ({
 
   const existingDsConfig = Object.values(existingDs);
   const currentBackingIndexConfig = existingDsConfig.at(-1);
-
   const currentIndexMode = currentBackingIndexConfig?.settings?.index?.mode;
   // @ts-expect-error Property 'mode' does not exist on type 'MappingSourceField'
   const currentSourceType = currentBackingIndexConfig.mappings?._source?.mode;
@@ -1014,7 +1019,7 @@ const updateExistingDataStream = async ({
   let settings: IndicesIndexSettings;
   let mappings: MappingTypeMapping;
   let lifecycle: any;
-
+  let subobjectsFieldChanged: boolean = false;
   try {
     const simulateResult = await retryTransientEsErrors(async () =>
       esClient.indices.simulateTemplate({
@@ -1034,7 +1039,9 @@ const updateExistingDataStream = async ({
       delete mappings.properties.stream;
       delete mappings.properties.data_stream;
     }
-
+    if (currentBackingIndexConfig?.mappings?.subobjects !== mappings.subobjects) {
+      subobjectsFieldChanged = true;
+    }
     logger.info(`Attempt to update the mappings for the ${dataStreamName} (write_index_only)`);
     await retryTransientEsErrors(
       () =>
@@ -1049,9 +1056,11 @@ const updateExistingDataStream = async ({
     // if update fails, rollover data stream and bail out
   } catch (err) {
     if (
-      isResponseError(err) &&
-      err.statusCode === 400 &&
-      err.body?.error?.type === 'illegal_argument_exception'
+      (isResponseError(err) &&
+        err.statusCode === 400 &&
+        err.body?.error?.type === 'illegal_argument_exception') ||
+      // handling the case when subobjects field changed, it should also trigger a rollover
+      subobjectsFieldChanged
     ) {
       logger.info(`Mappings update for ${dataStreamName} failed due to ${err}`);
       if (options?.skipDataStreamRollover === true) {

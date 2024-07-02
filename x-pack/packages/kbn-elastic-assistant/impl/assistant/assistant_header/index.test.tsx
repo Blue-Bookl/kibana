@@ -14,12 +14,12 @@ import { useLoadConnectors } from '../../connectorland/use_load_connectors';
 import { mockConnectors } from '../../mock/connectors';
 
 const onConversationSelected = jest.fn();
-const setCurrentConversation = jest.fn();
 const mockConversations = {
   [alertConvo.title]: alertConvo,
   [welcomeConvo.title]: welcomeConvo,
 };
 const testProps = {
+  conversationsLoaded: true,
   currentConversation: welcomeConvo,
   title: 'Test Title',
   docLinks: {
@@ -32,11 +32,12 @@ const testProps = {
   onToggleShowAnonymizedValues: jest.fn(),
   selectedConversationId: emptyWelcomeConvo.id,
   setIsSettingsModalVisible: jest.fn(),
-  setCurrentConversation,
   onConversationDeleted: jest.fn(),
   showAnonymizedValues: false,
   conversations: mockConversations,
   refetchConversationsState: jest.fn(),
+  anonymizationFields: { total: 0, page: 1, perPage: 1000, data: [] },
+  refetchAnonymizationFieldsResults: jest.fn(),
 };
 
 jest.mock('../../connectorland/use_load_connectors', () => ({
@@ -119,7 +120,6 @@ describe('AssistantHeader', () => {
     await act(async () => {
       fireEvent.click(getByTestId('connectorId'));
     });
-    expect(setCurrentConversation).toHaveBeenCalledWith(alertConvo);
     expect(onConversationSelected).toHaveBeenCalledWith({
       cId: alertConvo.id,
       cTitle: alertConvo.title,

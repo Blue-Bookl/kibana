@@ -59,6 +59,7 @@ export interface HeaderActionProps {
   onSelectAll: ({ isSelected }: { isSelected: boolean }) => void;
   showEventsSelect: boolean;
   showSelectAllCheckbox: boolean;
+  showFullScreenToggle?: boolean;
   sort: SortColumnTable[];
   tabType: string;
   timelineId: string;
@@ -69,7 +70,8 @@ export type HeaderCellRender = ComponentType | ComponentType<HeaderActionProps>;
 type GenericActionRowCellRenderProps = Pick<
   EuiDataGridCellValueElementProps,
   'rowIndex' | 'columnId'
->;
+> &
+  Partial<EuiDataGridCellValueElementProps>;
 
 export type RowCellRender =
   | JSXElementConstructor<GenericActionRowCellRenderProps>
@@ -84,6 +86,7 @@ export interface ActionProps {
   columnId: string;
   columnValues: string;
   data: TimelineNonEcsData[];
+  disableExpandAction?: boolean;
   disabled?: boolean;
   ecsData: Ecs;
   eventId: string;
@@ -114,7 +117,6 @@ interface AdditionalControlColumnProps {
   checked: boolean;
   onRowSelected: OnRowSelected;
   eventId: string;
-  id: string;
   columnId: string;
   loadingEventIds: Readonly<string[]>;
   onEventDetailsPanelOpened: () => void;

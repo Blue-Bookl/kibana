@@ -10,18 +10,21 @@ import { EuiButtonIcon, EuiToolTip } from '@elastic/eui';
 
 import { AIConnector } from '../../connectorland/connector_selector';
 import { Conversation } from '../../..';
-import { AssistantSettings, CONVERSATIONS_TAB } from './assistant_settings';
+import { AssistantSettings } from './assistant_settings';
 import * as i18n from './translations';
 import { useAssistantContext } from '../../assistant_context';
+import { CONVERSATIONS_TAB } from './const';
 
 interface Props {
   defaultConnector?: AIConnector;
   isSettingsModalVisible: boolean;
-  selectedConversation: Conversation;
+  selectedConversationId?: string;
   setIsSettingsModalVisible: React.Dispatch<React.SetStateAction<boolean>>;
   onConversationSelected: ({ cId, cTitle }: { cId: string; cTitle: string }) => void;
   isDisabled?: boolean;
+  isFlyoutMode: boolean;
   conversations: Record<string, Conversation>;
+  conversationsLoaded: boolean;
   refetchConversationsState: () => Promise<void>;
 }
 
@@ -34,9 +37,11 @@ export const AssistantSettingsButton: React.FC<Props> = React.memo(
     isDisabled = false,
     isSettingsModalVisible,
     setIsSettingsModalVisible,
-    selectedConversation,
+    selectedConversationId,
+    isFlyoutMode,
     onConversationSelected,
     conversations,
+    conversationsLoaded,
     refetchConversationsState,
   }) => {
     const { toasts, setSelectedSettingsTab } = useAssistantContext();
@@ -79,17 +84,20 @@ export const AssistantSettingsButton: React.FC<Props> = React.memo(
             isDisabled={isDisabled}
             iconType="gear"
             size="xs"
+            {...(isFlyoutMode ? { color: 'text' } : {})}
           />
         </EuiToolTip>
 
         {isSettingsModalVisible && (
           <AssistantSettings
             defaultConnector={defaultConnector}
-            selectedConversation={selectedConversation}
+            selectedConversationId={selectedConversationId}
             onConversationSelected={onConversationSelected}
             onClose={handleCloseModal}
             onSave={handleSave}
+            isFlyoutMode={isFlyoutMode}
             conversations={conversations}
+            conversationsLoaded={conversationsLoaded}
           />
         )}
       </>

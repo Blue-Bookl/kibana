@@ -18,6 +18,9 @@ import {
   addRiskInputToTimelineClickedEvent,
   RiskInputsExpandedFlyoutOpenedEvent,
   toggleRiskSummaryClickedEvent,
+  assetCriticalityCsvPreviewGeneratedEvent,
+  assetCriticalityFileSelectedEvent,
+  assetCriticalityCsvImportedEvent,
 } from './entity_analytics';
 import {
   assistantInvokedEvent,
@@ -30,6 +33,11 @@ import {
   DocumentDetailsFlyoutOpenedEvent,
   DocumentDetailsTabClickedEvent,
 } from './document_details';
+import {
+  onboardingHubStepFinishedEvent,
+  onboardingHubStepLinkClickedEvent,
+  onboardingHubStepOpenEvent,
+} from './onboarding';
 
 const mlJobUpdateEvent: TelemetryEvent = {
   eventType: TelemetryEventTypes.MLJobUpdate,
@@ -150,6 +158,9 @@ export const telemetryEvents = [
   entityClickedEvent,
   entityAlertsClickedEvent,
   entityRiskFilteredEvent,
+  assetCriticalityCsvPreviewGeneratedEvent,
+  assetCriticalityFileSelectedEvent,
+  assetCriticalityCsvImportedEvent,
   toggleRiskSummaryClickedEvent,
   RiskInputsExpandedFlyoutOpenedEvent,
   addRiskInputToTimelineClickedEvent,
@@ -161,4 +172,7 @@ export const telemetryEvents = [
   breadCrumbClickedEvent,
   DocumentDetailsFlyoutOpenedEvent,
   DocumentDetailsTabClickedEvent,
+  onboardingHubStepOpenEvent,
+  onboardingHubStepLinkClickedEvent,
+  onboardingHubStepFinishedEvent,
 ];

@@ -7,11 +7,11 @@
 
 import { Filter } from '@kbn/es-query';
 import { QueryDslQueryContainer } from '@elastic/elasticsearch/lib/api/types';
-import { Group } from '../types';
+import type { Group } from '../../typings';
 
 /*
  * groupFieldName
- * In some cases, like AAD indices, the field name for group value is differen from group.field,
+ * In some cases, like AAD indices, the field name for group value is different from group.field,
  * in AAD case, it is ALERT_GROUP_VALUE (`kibana.alert.group.value`). groupFieldName allows
  * passing a different field name to be used in the query.
  */

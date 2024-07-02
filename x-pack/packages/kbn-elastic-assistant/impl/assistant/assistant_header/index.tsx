@@ -12,33 +12,33 @@ import {
   EuiHorizontalRule,
   EuiSpacer,
   EuiSwitch,
-  EuiSwitchEvent,
   EuiToolTip,
 } from '@elastic/eui';
 import { css } from '@emotion/react';
 import { DocLinksStart } from '@kbn/core-doc-links-browser';
+import { isEmpty } from 'lodash';
 import { AIConnector } from '../../connectorland/connector_selector';
 import { Conversation } from '../../..';
 import { AssistantTitle } from '../assistant_title';
 import { ConversationSelector } from '../conversations/conversation_selector';
 import { AssistantSettingsButton } from '../settings/assistant_settings_button';
-import * as i18n from '../translations';
+import * as i18n from './translations';
 
 interface OwnProps {
-  currentConversation: Conversation;
+  currentConversation?: Conversation;
   defaultConnector?: AIConnector;
   docLinks: Omit<DocLinksStart, 'links'>;
   isDisabled: boolean;
   isSettingsModalVisible: boolean;
   onConversationSelected: ({ cId, cTitle }: { cId: string; cTitle: string }) => void;
   onConversationDeleted: (conversationId: string) => void;
-  onToggleShowAnonymizedValues: (e: EuiSwitchEvent) => void;
+  onToggleShowAnonymizedValues: () => void;
   setIsSettingsModalVisible: React.Dispatch<React.SetStateAction<boolean>>;
-  setCurrentConversation: React.Dispatch<React.SetStateAction<Conversation>>;
   shouldDisableKeyboardShortcut?: () => boolean;
   showAnonymizedValues: boolean;
-  title: string | JSX.Element;
+  title: string;
   conversations: Record<string, Conversation>;
+  conversationsLoaded: boolean;
   refetchConversationsState: () => Promise<void>;
 }
 
@@ -61,27 +61,32 @@ export const AssistantHeader: React.FC<Props> = ({
   shouldDisableKeyboardShortcut,
   showAnonymizedValues,
   title,
-  setCurrentConversation,
   conversations,
+  conversationsLoaded,
   refetchConversationsState,
 }) => {
   const showAnonymizedValuesChecked = useMemo(
     () =>
-      currentConversation.replacements != null &&
-      Object.keys(currentConversation.replacements).length > 0 &&
+      currentConversation?.replacements != null &&
+      Object.keys(currentConversation?.replacements).length > 0 &&
       showAnonymizedValues,
-    [currentConversation.replacements, showAnonymizedValues]
+    [currentConversation?.replacements, showAnonymizedValues]
   );
   const onConversationChange = useCallback(
     (updatedConversation) => {
-      setCurrentConversation(updatedConversation);
       onConversationSelected({
         cId: updatedConversation.id,
         cTitle: updatedConversation.title,
       });
     },
-    [onConversationSelected, setCurrentConversation]
+    [onConversationSelected]
   );
+  const selectedConversationId = useMemo(
+    () =>
+      !isEmpty(currentConversation?.id) ? currentConversation?.id : currentConversation?.title,
+    [currentConversation?.id, currentConversation?.title]
+  );
+
   return (
     <>
       <EuiFlexGroup
@@ -98,6 +103,8 @@ export const AssistantHeader: React.FC<Props> = ({
             selectedConversation={currentConversation}
             onChange={onConversationChange}
             title={title}
+            isFlyoutMode={false}
+            refetchConversationsState={refetchConversationsState}
           />
         </EuiFlexItem>
 
@@ -109,7 +116,7 @@ export const AssistantHeader: React.FC<Props> = ({
         >
           <ConversationSelector
             defaultConnector={defaultConnector}
-            selectedConversationTitle={currentConversation.title}
+            selectedConversationId={selectedConversationId}
             onConversationSelected={onConversationSelected}
             shouldDisableKeyboardShortcut={shouldDisableKeyboardShortcut}
             isDisabled={isDisabled}
@@ -130,7 +137,7 @@ export const AssistantHeader: React.FC<Props> = ({
                     data-test-subj="showAnonymizedValues"
                     checked={showAnonymizedValuesChecked}
                     compressed={true}
-                    disabled={currentConversation.replacements == null}
+                    disabled={isEmpty(currentConversation?.replacements)}
                     label={i18n.SHOW_ANONYMIZED}
                     onChange={onToggleShowAnonymizedValues}
                   />
@@ -142,11 +149,13 @@ export const AssistantHeader: React.FC<Props> = ({
                   defaultConnector={defaultConnector}
                   isDisabled={isDisabled}
                   isSettingsModalVisible={isSettingsModalVisible}
-                  selectedConversation={currentConversation}
+                  selectedConversationId={selectedConversationId}
                   setIsSettingsModalVisible={setIsSettingsModalVisible}
                   onConversationSelected={onConversationSelected}
                   conversations={conversations}
+                  conversationsLoaded={conversationsLoaded}
                   refetchConversationsState={refetchConversationsState}
+                  isFlyoutMode={false}
                 />
               </EuiFlexItem>
             </EuiFlexGroup>

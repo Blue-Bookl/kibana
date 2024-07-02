@@ -11,11 +11,38 @@ import {
   PromptResponse,
   PromptUpdateProps,
 } from '@kbn/elastic-assistant-common/impl/schemas/prompts/bulk_crud_prompts_route.gen';
-import { AuthenticatedUser } from '@kbn/security-plugin-types-common';
-import { CreatePromptSchema, SearchEsPromptsSchema, UpdatePromptSchema } from './types';
+import { AuthenticatedUser } from '@kbn/core-security-common';
+import { CreatePromptSchema, EsPromptsSchema, UpdatePromptSchema } from './types';
 
-export const transformESToPrompts = (
-  response: estypes.SearchResponse<SearchEsPromptsSchema>
+export const transformESToPrompts = (response: EsPromptsSchema[]): PromptResponse[] => {
+  return response.map((promptSchema) => {
+    const prompt: PromptResponse = {
+      timestamp: promptSchema['@timestamp'],
+      createdAt: promptSchema.created_at,
+      users:
+        promptSchema.users?.map((user) => ({
+          id: user.id,
+          name: user.name,
+        })) ?? [],
+      content: promptSchema.content,
+      isDefault: promptSchema.is_default,
+      isNewConversationDefault: promptSchema.is_new_conversation_default,
+      updatedAt: promptSchema.updated_at,
+      namespace: promptSchema.namespace,
+      id: promptSchema.id,
+      name: promptSchema.name,
+      promptType: promptSchema.prompt_type,
+      isShared: promptSchema.is_shared,
+      createdBy: promptSchema.created_by,
+      updatedBy: promptSchema.updated_by,
+    };
+
+    return prompt;
+  });
+};
+
+export const transformESSearchToPrompts = (
+  response: estypes.SearchResponse<EsPromptsSchema>
 ): PromptResponse[] => {
   return response.hits.hits
     .filter((hit) => hit._source !== undefined)
@@ -35,7 +62,8 @@ export const transformESToPrompts = (
         isNewConversationDefault: promptSchema.is_new_conversation_default,
         updatedAt: promptSchema.updated_at,
         namespace: promptSchema.namespace,
-        id: hit._id,
+        // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+        id: hit._id!,
         name: promptSchema.name,
         promptType: promptSchema.prompt_type,
         isShared: promptSchema.is_shared,

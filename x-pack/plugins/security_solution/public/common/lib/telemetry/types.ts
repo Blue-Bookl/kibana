@@ -5,9 +5,8 @@
  * 2.0.
  */
 
-import type { RootSchema } from '@kbn/analytics-client';
-import type { AnalyticsServiceSetup } from '@kbn/core/public';
-import type { SecurityMetadata } from '../../../actions/types';
+import type { AnalyticsServiceSetup, RootSchema } from '@kbn/core/public';
+import type { SecurityCellActionMetadata } from '../../../app/actions/types';
 import type { ML_JOB_TELEMETRY_STATUS, TelemetryEventTypes } from './constants';
 import type {
   AlertsGroupingTelemetryEvent,
@@ -30,6 +29,9 @@ import type {
   ReportEntityRiskFilteredParams,
   ReportRiskInputsExpandedFlyoutOpenedParams,
   ReportToggleRiskSummaryClickedParams,
+  ReportAssetCriticalityCsvPreviewGeneratedParams,
+  ReportAssetCriticalityFileSelectedParams,
+  ReportAssetCriticalityCsvImportedParams,
 } from './events/entity_analytics/types';
 import type {
   AssistantTelemetryEvent,
@@ -45,10 +47,17 @@ import type {
   ReportDetailsFlyoutOpenedParams,
   ReportDetailsFlyoutTabClickedParams,
 } from './events/document_details/types';
+import type {
+  OnboardingHubStepFinishedParams,
+  OnboardingHubStepLinkClickedParams,
+  OnboardingHubStepOpenParams,
+  OnboardingHubTelemetryEvent,
+} from './events/onboarding/types';
 
 export * from './events/ai_assistant/types';
 export * from './events/alerts_grouping/types';
 export * from './events/data_quality/types';
+export * from './events/onboarding/types';
 export type {
   ReportEntityAlertsClickedParams,
   ReportEntityDetailsClickedParams,
@@ -56,6 +65,9 @@ export type {
   ReportRiskInputsExpandedFlyoutOpenedParams,
   ReportToggleRiskSummaryClickedParams,
   ReportAddRiskInputToTimelineClickedParams,
+  ReportAssetCriticalityCsvPreviewGeneratedParams,
+  ReportAssetCriticalityFileSelectedParams,
+  ReportAssetCriticalityCsvImportedParams,
 } from './events/entity_analytics/types';
 export * from './events/document_details/types';
 
@@ -72,7 +84,7 @@ export interface ReportMLJobUpdateParams {
 }
 
 export interface ReportCellActionClickedParams {
-  metadata: SecurityMetadata | undefined;
+  metadata: SecurityCellActionMetadata | undefined;
   displayName: string;
   actionId: string;
   fieldName: string;
@@ -97,13 +109,17 @@ export type TelemetryEventParams =
   | ReportDataQualityIndexCheckedParams
   | ReportDataQualityCheckAllCompletedParams
   | ReportBreadcrumbClickedParams
-  | ReportDocumentDetailsTelemetryEventParams;
+  | ReportDocumentDetailsTelemetryEventParams
+  | OnboardingHubStepOpenParams
+  | OnboardingHubStepFinishedParams
+  | OnboardingHubStepLinkClickedParams;
 
 export interface TelemetryClientStart {
   reportAlertsGroupingChanged(params: ReportAlertsGroupingChangedParams): void;
   reportAlertsGroupingToggled(params: ReportAlertsGroupingToggledParams): void;
   reportAlertsGroupingTakeAction(params: ReportAlertsTakeActionParams): void;
 
+  // Assistant
   reportAssistantInvoked(params: ReportAssistantInvokedParams): void;
   reportAssistantMessageSent(params: ReportAssistantMessageSentParams): void;
   reportAssistantQuickPrompt(params: ReportAssistantQuickPromptParams): void;
@@ -118,7 +134,12 @@ export interface TelemetryClientStart {
   reportToggleRiskSummaryClicked(params: ReportToggleRiskSummaryClickedParams): void;
   reportRiskInputsExpandedFlyoutOpened(params: ReportRiskInputsExpandedFlyoutOpenedParams): void;
   reportAddRiskInputToTimelineClicked(params: ReportAddRiskInputToTimelineClickedParams): void;
-
+  // Entity Analytics Asset Criticality
+  reportAssetCriticalityFileSelected(params: ReportAssetCriticalityFileSelectedParams): void;
+  reportAssetCriticalityCsvPreviewGenerated(
+    params: ReportAssetCriticalityCsvPreviewGeneratedParams
+  ): void;
+  reportAssetCriticalityCsvImported(params: ReportAssetCriticalityCsvImportedParams): void;
   reportCellActionClicked(params: ReportCellActionClickedParams): void;
 
   reportAnomaliesCountClicked(params: ReportAnomaliesCountClickedParams): void;
@@ -129,6 +150,11 @@ export interface TelemetryClientStart {
   // document details flyout
   reportDetailsFlyoutOpened(params: ReportDetailsFlyoutOpenedParams): void;
   reportDetailsFlyoutTabClicked(params: ReportDetailsFlyoutTabClickedParams): void;
+
+  // onboarding hub
+  reportOnboardingHubStepOpen(params: OnboardingHubStepOpenParams): void;
+  reportOnboardingHubStepFinished(params: OnboardingHubStepFinishedParams): void;
+  reportOnboardingHubStepLinkClicked(params: OnboardingHubStepLinkClickedParams): void;
 }
 
 export type TelemetryEvent =
@@ -152,4 +178,5 @@ export type TelemetryEvent =
   | {
       eventType: TelemetryEventTypes.BreadcrumbClicked;
       schema: RootSchema<ReportBreadcrumbClickedParams>;
-    };
+    }
+  | OnboardingHubTelemetryEvent;

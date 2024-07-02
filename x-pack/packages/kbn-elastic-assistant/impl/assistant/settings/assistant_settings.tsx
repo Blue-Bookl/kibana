@@ -5,7 +5,7 @@
  * 2.0.
  */
 
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   EuiButton,
   EuiButtonEmpty,
@@ -24,7 +24,7 @@ import {
 import styled from 'styled-components';
 import { css } from '@emotion/react';
 import { AIConnector } from '../../connectorland/connector_selector';
-import { Conversation, Prompt, QuickPrompt } from '../../..';
+import { Conversation, Prompt, QuickPrompt, useLoadConnectors } from '../../..';
 import * as i18n from './translations';
 import { useAssistantContext } from '../../assistant_context';
 import { TEST_IDS } from '../constants';
@@ -37,35 +37,32 @@ import {
   QuickPromptSettings,
   SystemPromptSettings,
 } from '.';
+import { useFetchAnonymizationFields } from '../api/anonymization_fields/use_fetch_anonymization_fields';
+import {
+  ANONYMIZATION_TAB,
+  CONVERSATIONS_TAB,
+  EVALUATION_TAB,
+  KNOWLEDGE_BASE_TAB,
+  QUICK_PROMPTS_TAB,
+  SYSTEM_PROMPTS_TAB,
+} from './const';
 
 const StyledEuiModal = styled(EuiModal)`
   width: 800px;
   height: 575px;
 `;
 
-export const CONVERSATIONS_TAB = 'CONVERSATION_TAB' as const;
-export const QUICK_PROMPTS_TAB = 'QUICK_PROMPTS_TAB' as const;
-export const SYSTEM_PROMPTS_TAB = 'SYSTEM_PROMPTS_TAB' as const;
-export const ANONYMIZATION_TAB = 'ANONYMIZATION_TAB' as const;
-export const KNOWLEDGE_BASE_TAB = 'KNOWLEDGE_BASE_TAB' as const;
-export const EVALUATION_TAB = 'EVALUATION_TAB' as const;
-
-export type SettingsTabs =
-  | typeof CONVERSATIONS_TAB
-  | typeof QUICK_PROMPTS_TAB
-  | typeof SYSTEM_PROMPTS_TAB
-  | typeof ANONYMIZATION_TAB
-  | typeof KNOWLEDGE_BASE_TAB
-  | typeof EVALUATION_TAB;
 interface Props {
   defaultConnector?: AIConnector;
   onClose: (
     event?: React.KeyboardEvent<HTMLDivElement> | React.MouseEvent<HTMLButtonElement>
   ) => void;
+  isFlyoutMode: boolean;
   onSave: (success: boolean) => Promise<void>;
-  selectedConversation: Conversation;
+  selectedConversationId?: string;
   onConversationSelected: ({ cId, cTitle }: { cId: string; cTitle: string }) => void;
   conversations: Record<string, Conversation>;
+  conversationsLoaded: boolean;
 }
 
 /**
@@ -77,51 +74,67 @@ export const AssistantSettings: React.FC<Props> = React.memo(
     defaultConnector,
     onClose,
     onSave,
-    selectedConversation: defaultSelectedConversation,
+    selectedConversationId: defaultSelectedConversationId,
     onConversationSelected,
     conversations,
+    conversationsLoaded,
+    isFlyoutMode,
   }) => {
     const {
       actionTypeRegistry,
-      modelEvaluatorEnabled,
+      assistantFeatures: { assistantModelEvaluation: modelEvaluatorEnabled },
       http,
+      toasts,
       selectedSettingsTab,
       setSelectedSettingsTab,
     } = useAssistantContext();
 
+    useEffect(() => {
+      if (selectedSettingsTab == null) {
+        setSelectedSettingsTab(CONVERSATIONS_TAB);
+      }
+    }, [selectedSettingsTab, setSelectedSettingsTab]);
+
+    const { data: anonymizationFields, refetch: refetchAnonymizationFieldsResults } =
+      useFetchAnonymizationFields();
+
+    const { data: connectors } = useLoadConnectors({
+      http,
+    });
+
     const {
       conversationSettings,
       setConversationSettings,
-      defaultAllow,
-      defaultAllowReplacement,
       knowledgeBase,
       quickPromptSettings,
       systemPromptSettings,
-      setUpdatedDefaultAllow,
-      setUpdatedDefaultAllowReplacement,
+      assistantStreamingEnabled,
+      setUpdatedAssistantStreamingEnabled,
       setUpdatedKnowledgeBaseSettings,
       setUpdatedQuickPromptSettings,
       setUpdatedSystemPromptSettings,
       saveSettings,
       conversationsSettingsBulkActions,
+      updatedAnonymizationData,
       setConversationsSettingsBulkActions,
-    } = useSettingsUpdater(conversations);
+      anonymizationFieldsBulkActions,
+      setAnonymizationFieldsBulkActions,
+      setUpdatedAnonymizationData,
+    } = useSettingsUpdater(conversations, conversationsLoaded, anonymizationFields);
 
     // Local state for saving previously selected items so tab switching is friendlier
     // Conversation Selection State
-    const [selectedConversation, setSelectedConversation] = useState<Conversation | undefined>(
-      () => {
-        return conversationSettings[defaultSelectedConversation.title];
-      }
+    const [selectedConversationId, setSelectedConversationId] = useState<string | undefined>(
+      defaultSelectedConversationId
     );
     const onHandleSelectedConversationChange = useCallback((conversation?: Conversation) => {
-      setSelectedConversation(conversation);
+      setSelectedConversationId(conversation?.id);
     }, []);
-    useEffect(() => {
-      if (selectedConversation != null) {
-        setSelectedConversation(conversationSettings[selectedConversation.title]);
-      }
-    }, [conversationSettings, selectedConversation]);
+
+    const selectedConversation = useMemo(
+      () => (selectedConversationId ? conversationSettings[selectedConversationId] : undefined),
+      [conversationSettings, selectedConversationId]
+    );
 
     // Quick Prompt Selection State
     const [selectedQuickPrompt, setSelectedQuickPrompt] = useState<QuickPrompt | undefined>();
@@ -150,7 +163,8 @@ export const AssistantSettings: React.FC<Props> = React.memo(
     const handleSave = useCallback(async () => {
       // If the selected conversation is deleted, we need to select a new conversation to prevent a crash creating a conversation that already exists
       const isSelectedConversationDeleted =
-        conversationSettings[defaultSelectedConversation.title] == null;
+        defaultSelectedConversationId &&
+        conversationSettings[defaultSelectedConversationId] == null;
       const newSelectedConversation: Conversation | undefined =
         Object.values(conversationSettings)[0];
       if (isSelectedConversationDeleted && newSelectedConversation != null) {
@@ -160,13 +174,27 @@ export const AssistantSettings: React.FC<Props> = React.memo(
         });
       }
       const saveResult = await saveSettings();
+      toasts?.addSuccess({
+        iconType: 'check',
+        title: i18n.SETTINGS_UPDATED_TOAST_TITLE,
+      });
+      if (
+        (anonymizationFieldsBulkActions?.create?.length ?? 0) > 0 ||
+        (anonymizationFieldsBulkActions?.update?.length ?? 0) > 0 ||
+        (anonymizationFieldsBulkActions?.delete?.ids?.length ?? 0) > 0
+      ) {
+        await refetchAnonymizationFieldsResults();
+      }
       await onSave(saveResult);
     }, [
+      anonymizationFieldsBulkActions,
       conversationSettings,
-      defaultSelectedConversation.title,
+      defaultSelectedConversationId,
       onConversationSelected,
       onSave,
+      refetchAnonymizationFieldsResults,
       saveSettings,
+      toasts,
     ]);
 
     return (
@@ -183,7 +211,7 @@ export const AssistantSettings: React.FC<Props> = React.memo(
               <EuiKeyPadMenuItem
                 id={CONVERSATIONS_TAB}
                 label={i18n.CONVERSATIONS_MENU_ITEM}
-                isSelected={selectedSettingsTab === CONVERSATIONS_TAB}
+                isSelected={!selectedSettingsTab || selectedSettingsTab === CONVERSATIONS_TAB}
                 onClick={() => setSelectedSettingsTab(CONVERSATIONS_TAB)}
                 data-test-subj={`${CONVERSATIONS_TAB}-button`}
               >
@@ -288,21 +316,26 @@ export const AssistantSettings: React.FC<Props> = React.memo(
                   overflow-y: scroll;
                 `}
               >
-                {selectedSettingsTab === CONVERSATIONS_TAB && (
-                  <ConversationSettings
-                    actionTypeRegistry={actionTypeRegistry}
-                    defaultConnector={defaultConnector}
-                    conversationSettings={conversationSettings}
-                    setConversationsSettingsBulkActions={setConversationsSettingsBulkActions}
-                    conversationsSettingsBulkActions={conversationsSettingsBulkActions}
-                    setConversationSettings={setConversationSettings}
-                    allSystemPrompts={systemPromptSettings}
-                    selectedConversation={selectedConversation}
-                    isDisabled={selectedConversation == null}
-                    onSelectedConversationChange={onHandleSelectedConversationChange}
-                    http={http}
-                  />
-                )}
+                {!selectedSettingsTab ||
+                  (selectedSettingsTab === CONVERSATIONS_TAB && (
+                    <ConversationSettings
+                      actionTypeRegistry={actionTypeRegistry}
+                      connectors={connectors}
+                      defaultConnector={defaultConnector}
+                      conversationSettings={conversationSettings}
+                      setConversationsSettingsBulkActions={setConversationsSettingsBulkActions}
+                      conversationsSettingsBulkActions={conversationsSettingsBulkActions}
+                      setConversationSettings={setConversationSettings}
+                      allSystemPrompts={systemPromptSettings}
+                      selectedConversation={selectedConversation}
+                      isDisabled={selectedConversation == null}
+                      assistantStreamingEnabled={assistantStreamingEnabled}
+                      setAssistantStreamingEnabled={setUpdatedAssistantStreamingEnabled}
+                      onSelectedConversationChange={onHandleSelectedConversationChange}
+                      http={http}
+                      isFlyoutMode={isFlyoutMode}
+                    />
+                  ))}
                 {selectedSettingsTab === QUICK_PROMPTS_TAB && (
                   <QuickPromptSettings
                     quickPromptSettings={quickPromptSettings}
@@ -313,6 +346,7 @@ export const AssistantSettings: React.FC<Props> = React.memo(
                 )}
                 {selectedSettingsTab === SYSTEM_PROMPTS_TAB && (
                   <SystemPromptSettings
+                    connectors={connectors}
                     conversationSettings={conversationSettings}
                     defaultConnector={defaultConnector}
                     systemPromptSettings={systemPromptSettings}
@@ -326,11 +360,11 @@ export const AssistantSettings: React.FC<Props> = React.memo(
                 )}
                 {selectedSettingsTab === ANONYMIZATION_TAB && (
                   <AnonymizationSettings
-                    defaultAllow={defaultAllow}
-                    defaultAllowReplacement={defaultAllowReplacement}
-                    pageSize={5}
-                    setUpdatedDefaultAllow={setUpdatedDefaultAllow}
-                    setUpdatedDefaultAllowReplacement={setUpdatedDefaultAllowReplacement}
+                    defaultPageSize={5}
+                    anonymizationFields={updatedAnonymizationData}
+                    anonymizationFieldsBulkActions={anonymizationFieldsBulkActions}
+                    setAnonymizationFieldsBulkActions={setAnonymizationFieldsBulkActions}
+                    setUpdatedAnonymizationData={setUpdatedAnonymizationData}
                   />
                 )}
                 {selectedSettingsTab === KNOWLEDGE_BASE_TAB && (
